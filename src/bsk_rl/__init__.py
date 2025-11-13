@@ -6,12 +6,14 @@ from bsk_rl.gym import (
     ConstellationTasking,
     GeneralSatelliteTasking,
     SatelliteTasking,
+    ConstellationNStepsTasking,
 )
 
 __all__ = [
     "GeneralSatelliteTasking",
     "SatelliteTasking",
     "ConstellationTasking",
+    "ConstellationNStepsTasking"
 ]
 
 register(
@@ -27,4 +29,9 @@ register(
 register(
     id="ConstellationTasking-v1",
     entry_point="bsk_rl.gym:ConstellationTasking",
+)
+
+register(
+    id="ConstellationNStepsTasking-v1",
+    entry_point="bsk_rl.gym:ConstellationNStepsTasking",
 )

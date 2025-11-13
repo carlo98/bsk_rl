@@ -24,7 +24,7 @@ from ray.rllib.utils.numpy import convert_to_numpy
 from ray.rllib.utils.spaces.space_utils import unsquash_action
 from ray.tune.registry import register_env
 
-from bsk_rl import ConstellationTasking, GeneralSatelliteTasking, SatelliteTasking
+from bsk_rl import ConstellationTasking, GeneralSatelliteTasking, SatelliteTasking, ConstellationNStepsTasking
 from bsk_rl.utils.rllib.callbacks import EpisodeDataParallelWrapper, EpisodeDataWrapper
 
 
@@ -143,6 +143,27 @@ def _constellation_tasking_env_creator(env_config):
 
 
 register_env("ConstellationTasking-RLlib", _constellation_tasking_env_creator)
+
+def _constellation_tasking_nsteps_env_creator(env_config):
+    if "episode_data_callback" in env_config:
+        episode_data_callback = env_config.pop("episode_data_callback")
+    else:
+        episode_data_callback = None
+    if "satellite_data_callback" in env_config:
+        satellite_data_callback = env_config.pop("satellite_data_callback")
+    else:
+        satellite_data_callback = None
+
+    return ParallelPettingZooEnv(
+        EpisodeDataParallelWrapper(
+            ConstellationNStepsTasking(**env_config),
+            episode_data_callback=episode_data_callback,
+            satellite_data_callback=satellite_data_callback,
+        )
+    )
+
+
+register_env("ConstellationNStepsTasking-RLlib", _constellation_tasking_nsteps_env_creator)
 
 
 __doc_title__ = "RLlib Utilities"

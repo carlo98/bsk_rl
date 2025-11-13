@@ -923,6 +923,7 @@ class ConstellationTasking(
         previous_alive = self.agents
 
         sat_to_action_map = {}
+
         for agent, action in actions.items():
             if len(self.meta_agent_groupings[agent]) > 1:
                 logger.info(f"Decomposing action for meta agent {agent}")
@@ -932,6 +933,69 @@ class ConstellationTasking(
         for satellite in self.satellites:
             if satellite in sat_to_action_map:
                 action_vector.append(sat_to_action_map[satellite])
+            else:
+                action_vector.append(None)
+        self._step(action_vector)
+
+        self.newly_dead = list(set(previous_alive) - set(self.agents))
+
+        for agent in self.newly_dead:
+            for satellite in self.meta_agent_groupings[agent]:
+                for attr in [
+                    "_timed_terminal_event_name",
+                    "_image_event_name",
+                ]:
+                    event_name = getattr(satellite, attr, None)
+                    if event_name is not None:
+                        self.simulator.delete_event(event_name)
+
+        observation = self._get_obs()
+        reward = self._get_reward()
+        terminated = self._get_terminated()
+        truncated = self._get_truncated()
+        info = self._get_info()
+        nonzero_reward = {k: v for k, v in reward.items() if v != 0}
+        logger.info(f"Step reward: {nonzero_reward}")
+        if any(terminated.values()):
+            terminated_true = [k for k, v in terminated.items() if v]
+            logger.info(f"Episode terminated: {terminated_true}")
+        if any(truncated.values()):
+            truncated_true = [k for k, v in truncated.items() if v]
+            logger.info(f"Episode truncated: {truncated_true}")
+        logger.debug("Step info: %s", info)
+        logger.debug("Step observation: %s", observation)
+        return observation, reward, terminated, truncated, info
+
+class ConstellationNStepsTasking(
+    ConstellationTasking, GeneralSatelliteTasking, ParallelEnv, Generic[SatObs, SatAct, AgentID]
+):
+    def step(
+        self,
+        actions: dict[AgentID, SatAct],
+    ) -> tuple[
+        dict[AgentID, SatObs],
+        dict[AgentID, float],
+        dict[AgentID, bool],
+        dict[AgentID, bool],
+        dict[AgentID, dict],
+    ]:
+        """Step the environment and return PettingZoo Parallel API format."""
+        logger.info("=== STARTING STEP ===")
+
+        previous_alive = self.agents
+
+        sat_to_action_map = {}
+
+        for agent, action in actions.items():
+            if len(self.meta_agent_groupings[agent]) > 1:
+                logger.info(f"Decomposing action for meta agent {agent}")
+            sat_to_action_map.update(self._decompose_meta_action(agent, action[0]))
+
+        action_vector = []
+        for satellite in self.satellites:
+            if satellite in sat_to_action_map:
+                action_vector.append(sat_to_action_map[satellite])
+                satellite.planned_actions = actions[satellite.name]
             else:
                 action_vector.append(None)
         self._step(action_vector)
