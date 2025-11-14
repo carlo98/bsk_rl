@@ -969,6 +969,21 @@ class ConstellationTasking(
 class ConstellationNStepsTasking(
     ConstellationTasking, GeneralSatelliteTasking, ParallelEnv, Generic[SatObs, SatAct, AgentID]
 ):
+    def __init__(
+        self,
+        *args,
+        **kwargs,
+    ) -> None:
+        """Extends the `PettingZoo <https://pettingzoo.farama.org>`_ parallel API of the :class:`ConstellationTasking` environment 
+        to use NN models that predict N plan step instead of 1. The first one is acted on, while the follow N-1 are passed to each 
+        agent relative property.
+
+        Args:
+            *args: Passed to :class:`ConstellationTasking`.
+            **kwargs: Passed to :class:`ConstellationTasking`.
+        """
+        super().__init__(*args, **kwargs)
+    
     def step(
         self,
         actions: dict[AgentID, SatAct],
