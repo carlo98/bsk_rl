@@ -976,13 +976,48 @@ class ConstellationNStepsTasking(
     ) -> None:
         """Extends the `PettingZoo <https://pettingzoo.farama.org>`_ parallel API of the :class:`ConstellationTasking` environment 
         to use NN models that predict N plan step instead of 1. The first one is acted on, while the follow N-1 are passed to each 
-        agent relative property.
+        agent relative property. To be used with :class:`PlanHorizonSatellite`.
 
         Args:
             *args: Passed to :class:`ConstellationTasking`.
             **kwargs: Passed to :class:`ConstellationTasking`.
         """
         super().__init__(*args, **kwargs)
+
+    def _get_obs(self) -> dict[AgentID, SatObs]:
+        """Format the observation per the PettingZoo Parallel API."""
+        obs = {}
+        for agent, satellites in self.meta_agent_groupings.items():
+            # Don't generate observations for agents that are dead
+            if agent in self.previously_dead:
+                continue
+
+            if self.generate_obs_retasking_only and not self._requires_retasking(agent):
+                agent_obs = [
+                    satellite.observation_space.low * 0 for satellite in satellites
+                ]
+            else:
+                agent_obs = [satellite.get_obs() for satellite in satellites]
+
+            if len(agent_obs) == 1:
+                obs[agent] = agent_obs[0]
+            else:
+                obs[agent] = np.concatenate(agent_obs)
+
+        obs_id = 0
+        while self.satellites[0].observation_builder.observation_spec[obs_id].name != "target":
+            obs_id += 1
+            assert obs_id < len(self.satellites[0].observation_builder.observation_spec)
+        for satellite in self.satellites:
+            satellite.last_observation_targets = dict()
+            for i, opportunity in enumerate(satellite.find_next_opportunities(
+                    n=satellite.observation_builder.observation_spec[1].n_ahead_observe,
+                    types="target",
+                    pad=True,
+                )
+            ):
+                satellite.last_observation_targets[i+1] = opportunity["object"]
+        return obs
     
     def step(
         self,
